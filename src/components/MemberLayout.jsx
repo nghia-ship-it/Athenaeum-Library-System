@@ -20,17 +20,15 @@ export default function MemberLayout() {
       {/* Header */}
       <header className="sticky top-0 z-50 bg-background/95 backdrop-blur-md border-b border-[#302A24]">
         <div className="max-w-6xl mx-auto px-6 h-20 flex items-center justify-between">
-          
-          {/* Logo */}
-          <Link to="/portal" className="flex items-center gap-3 group">
-            <div className="w-10 h-10 rounded bg-primary text-background flex items-center justify-center font-serif font-bold text-xl group-hover:scale-105 transition-transform">
-              <Book size={24} />
-            </div>
-            <div>
-              <h1 className="font-serif text-2xl leading-tight tracking-wide font-bold">ATHENAEUM</h1>
-              <p className="text-xs tracking-[0.3em] text-primary uppercase font-semibold">Thư viện công cộng</p>
-            </div>
-          </Link>
+          <div className="flex items-center gap-6">
+            <Link to="/portal" className="flex items-center gap-3 group">
+              <img src="/logo.png" alt="Athenaeum Logo" className="w-10 h-10 object-contain rounded group-hover:scale-105 transition-transform" />
+              <div>
+                <h1 className="font-serif text-2xl leading-tight tracking-wide font-bold">ATHENAEUM</h1>
+                <p className="text-xs tracking-[0.3em] text-primary uppercase font-semibold">Thư viện công cộng</p>
+              </div>
+            </Link>
+          </div>
 
           {/* Navigation */}
           <nav className="flex items-center gap-8">

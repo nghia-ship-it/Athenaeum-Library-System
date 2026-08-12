@@ -107,9 +107,7 @@ export default function Login() {
         <div className="max-w-md w-full mx-auto">
           {/* Logo */}
           <div className="flex items-center gap-3 mb-12">
-            <div className="w-10 h-10 bg-primary rounded flex items-center justify-center text-background font-serif font-bold text-xl">
-              II|\
-            </div>
+            <img src="/logo.png" alt="Athenaeum Logo" className="w-12 h-12 object-contain rounded" />
             <div>
               <h1 className="font-serif font-bold text-lg leading-tight tracking-wide text-white">ATHENAEUM</h1>
               <p className="text-[10px] uppercase tracking-widest text-text-secondary">Library System</p>

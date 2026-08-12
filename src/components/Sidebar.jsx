@@ -92,9 +92,7 @@ export default function Sidebar() {
   return (
     <div className="w-64 border-r border-[#302A24] flex flex-col h-full bg-background/95 backdrop-blur-sm z-10">
       <div className="p-6 flex items-center gap-3">
-        <div className="w-8 h-8 rounded bg-primary text-background flex items-center justify-center font-serif font-bold text-lg">
-          <Book size={18} />
-        </div>
+        <img src="/logo.png" alt="Athenaeum Logo" className="w-10 h-10 object-contain rounded" />
         <div>
           <h1 className="font-serif text-lg leading-tight tracking-wide font-bold">ATHENAEUM</h1>
           <p className="text-[10px] tracking-widest text-text-secondary uppercase">Hệ thống thư viện</p>
