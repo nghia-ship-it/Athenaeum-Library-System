@@ -142,6 +142,28 @@ export default function Dashboard() {
 
   return (
     <div>
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div className="bg-surface border border-[#302A24] rounded-2xl p-6 relative overflow-hidden group hover:border-[#4A4036] transition-colors">
+           <div className="absolute top-0 right-0 w-24 h-24 bg-primary/10 rounded-bl-full -mr-8 -mt-8 transition-transform group-hover:scale-110 duration-500"></div>
+           <p className="text-4xl font-serif text-white mb-2 relative z-10">{stats.totalBooks}</p>
+           <p className="text-sm text-text-secondary relative z-10">Sách trong thư viện</p>
+        </div>
+        <div className="bg-surface border border-[#302A24] rounded-2xl p-6 relative overflow-hidden group hover:border-[#4A4036] transition-colors">
+           <div className="absolute top-0 right-0 w-24 h-24 bg-[#6A8B5F]/10 rounded-bl-full -mr-8 -mt-8 transition-transform group-hover:scale-110 duration-500"></div>
+           <p className="text-4xl font-serif text-white mb-2 relative z-10">{stats.totalMembers}</p>
+           <p className="text-sm text-text-secondary relative z-10">Thành viên đăng ký</p>
+        </div>
+        <div className="bg-surface border border-[#302A24] rounded-2xl p-6 relative overflow-hidden group hover:border-[#4A4036] transition-colors">
+           <div className="absolute top-0 right-0 w-24 h-24 bg-[#5F85A1]/10 rounded-bl-full -mr-8 -mt-8 transition-transform group-hover:scale-110 duration-500"></div>
+           <p className="text-4xl font-serif text-white mb-2 relative z-10">{stats.activeLoans}</p>
+           <p className="text-sm text-text-secondary relative z-10">Sách đang mượn</p>
+        </div>
+        <div className="bg-surface border border-[#302A24] rounded-2xl p-6 relative overflow-hidden border-l-4 border-l-[#C36453] group hover:bg-[#2A241E] transition-colors">
+           <div className="absolute top-0 right-0 w-24 h-24 bg-[#C36453]/10 rounded-bl-full -mr-8 -mt-8 transition-transform group-hover:scale-110 duration-500"></div>
+           <p className="text-4xl font-serif text-[#C36453] mb-2 relative z-10">{stats.overdueLoans}</p>
+           <p className="text-sm text-text-secondary relative z-10">Sách quá hạn</p>
+        </div>
+      </div>
       <DashboardCharts 
         trendData={trendData} 
         genreData={genreData} 
