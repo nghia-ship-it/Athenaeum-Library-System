@@ -39,8 +39,10 @@ export default function Members() {
   }, []);
 
   const filteredMembers = members.filter(member => {
-    const matchSearch = member.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                        member.email.toLowerCase().includes(searchTerm.toLowerCase());
+    const name = member.name || '';
+    const email = member.email || '';
+    const matchSearch = name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                        email.toLowerCase().includes(searchTerm.toLowerCase());
     const matchStatus = statusFilter === 'Tất cả' || member.status === statusFilter;
     return matchSearch && matchStatus;
   });

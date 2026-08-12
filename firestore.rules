@@ -1,0 +1,93 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ==========================================
+    // HELPER FUNCTIONS
+    // ==========================================
+    
+    // Kiểm tra xem người dùng có đăng nhập hay không
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Kiểm tra xem người dùng có phải là superadmin hay không
+    // Có 2 trường hợp: email là superadmin@gmail.com HOẶC trong database role = 'superadmin'
+    function isSuperAdmin() {
+      return isAuthenticated() && (
+        request.auth.token.email == 'superadmin@gmail.com' ||
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'superadmin'
+      );
+    }
+    
+    // Kiểm tra xem người dùng có phải là admin đang hoạt động hay không
+    // (Bao gồm cả admin và superadmin đã được kích hoạt)
+    function isActiveAdmin() {
+      return isAuthenticated() && (
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.status == 'active'
+      );
+    }
+
+    // ==========================================
+    // COLLECTIONS RULES
+    // ==========================================
+
+    // 1. BẢNG USERS (Quản trị viên)
+    match /users/{userId} {
+      // Đọc: Ai cũng có thể đọc thông tin của chính mình (để frontend check role). Superadmin đọc được tất cả.
+      allow read: if (isAuthenticated() && request.auth.uid == userId) || isSuperAdmin();
+      
+      // Tạo mới: Người dùng chỉ được tạo doc của chính họ.
+      // BẮT BUỘC role phải là 'admin' và status là 'pending'. Trừ khi họ là superadmin@gmail.com
+      allow create: if isAuthenticated() && request.auth.uid == userId && (
+        (request.resource.data.role == 'admin' && request.resource.data.status == 'pending') ||
+        (request.auth.token.email == 'superadmin@gmail.com' && request.resource.data.role == 'superadmin' && request.resource.data.status == 'active')
+      );
+      
+      // Sửa/Xóa: NGƯỜI DÙNG KHÔNG THỂ TỰ SỬA QUYỀN CỦA MÌNH. CHỈ CÓ SUPERADMIN MỚI CÓ QUYỀN SỬA VÀ XÓA.
+      allow update, delete: if isSuperAdmin();
+    }
+    
+    // 2. BẢNG BOOKS (Danh mục sách)
+    match /books/{bookId} {
+      // Mọi người (Kể cả khách không đăng nhập) đều xem được sách
+      allow read: if true;
+      // CHỈ CÓ admin đang hoạt động mới được phép Thêm/Sửa/Xóa sách
+      allow create, update, delete: if isActiveAdmin();
+    }
+    
+    // 3. BẢNG MEMBERS (Thẻ thành viên)
+    match /members/{memberId} {
+      // Cho phép public tra cứu thẻ thư viện bằng email
+      allow read: if true;
+      // Cho phép public đăng ký thẻ thành viên mới
+      allow create: if true;
+      // Chỉ admin mới có quyền sửa đổi và xóa thông tin thành viên
+      allow update, delete: if isActiveAdmin();
+    }
+    
+    // 4. BẢNG BORROWINGS (Phiếu mượn trả)
+    match /borrowings/{borrowId} {
+      // Cho phép public tra cứu lịch sử mượn
+      allow read: if true;
+      // Chỉ admin mới có quyền tạo phiếu mượn trả, hoặc sửa/xóa
+      allow create, update, delete: if isActiveAdmin();
+    }
+    
+    // 5. BẢNG RESERVATIONS (Phiếu đặt trước)
+    match /reservations/{reservationId} {
+      // Đọc phiếu đặt
+      allow read: if true;
+      // Để chặn BOT spam rác: Chỉ cho phép tạo phiếu đặt NẾU `memberId` truyền lên THỰC SỰ TỒN TẠI trong hệ thống
+      allow create: if exists(/databases/$(database)/documents/members/$(request.resource.data.memberId));
+      // Chỉ admin mới được sửa/xóa phiếu đặt (ví dụ: chuyển thành phiếu mượn)
+      allow update, delete: if isActiveAdmin();
+    }
+    
+    // 6. BẢNG FINES (Phiếu phạt)
+    match /fines/{fineId} {
+      allow read: if true;
+      allow create, update, delete: if isActiveAdmin();
+    }
+  }
+}

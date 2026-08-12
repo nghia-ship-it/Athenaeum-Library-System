@@ -1,17 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { collection, onSnapshot, addDoc } from 'firebase/firestore';
+import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
 import { db } from '../firebase';
+import { Edit2, Trash2 } from 'lucide-react';
 
 export default function BookCatalog() {
   const [books, setBooks] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [editingId, setEditingId] = useState(null);
 
   // Form state
   const [formData, setFormData] = useState({
     title: '',
     author: '',
-    genre: 'Kinh điển', // Default genre
+    genre: 'Kinh điển',
     year: '',
     shelf: '',
     total: 1
@@ -47,10 +49,39 @@ export default function BookCatalog() {
     }));
   };
 
+  const openAddModal = () => {
+    setEditingId(null);
+    setFormData({ title: '', author: '', genre: 'Kinh điển', year: '', shelf: '', total: 1 });
+    setIsModalOpen(true);
+  };
+
+  const openEditModal = (book) => {
+    setEditingId(book.id);
+    setFormData({
+      title: book.title,
+      author: book.author,
+      genre: book.genre,
+      year: book.year,
+      shelf: book.shelf,
+      total: book.total
+    });
+    setIsModalOpen(true);
+  };
+
+  const handleDeleteBook = async (id, title) => {
+    if (window.confirm(`Bạn có chắc muốn xóa sách "${title}"?`)) {
+      try {
+        await deleteDoc(doc(db, 'books', id));
+      } catch (error) {
+        console.error("Lỗi khi xóa sách:", error);
+        alert("Đã xảy ra lỗi khi xóa sách.");
+      }
+    }
+  };
+
   const handleAddBook = async (e) => {
     e.preventDefault();
     try {
-      // Mapping English genre for styling (internal use)
       const genreMap = {
         'Kinh điển': 'Classic',
         'Viễn tưởng': 'Fiction',
@@ -62,27 +93,50 @@ export default function BookCatalog() {
       };
 
       const engGenre = genreMap[formData.genre] || 'Classic';
-      const available = formData.total; // Mặc định khi mới thêm, tất cả sách đều có sẵn
 
-      await addDoc(collection(db, 'books'), {
-        title: formData.title,
-        author: formData.author,
-        genre: formData.genre,
-        engGenre: engGenre,
-        year: formData.year,
-        shelf: formData.shelf,
-        total: formData.total,
-        available: available,
-        status: 'Có sẵn',
-        createdAt: new Date()
-      });
+      if (editingId) {
+        // Edit Mode
+        const currentBook = books.find(b => b.id === editingId);
+        // Calculate new available based on change in total
+        const diff = formData.total - currentBook.total;
+        const newAvailable = currentBook.available + diff;
+        
+        if (newAvailable < 0) {
+          alert("Số lượng sách không hợp lệ vì hiện đang có người mượn nhiều hơn số lượng mới.");
+          return;
+        }
 
-      // Reset form & close modal
-      setFormData({ title: '', author: '', genre: 'Kinh điển', year: '', shelf: '', total: 1 });
+        await updateDoc(doc(db, 'books', editingId), {
+          title: formData.title,
+          author: formData.author,
+          genre: formData.genre,
+          engGenre: engGenre,
+          year: formData.year,
+          shelf: formData.shelf,
+          total: formData.total,
+          available: newAvailable
+        });
+      } else {
+        // Add Mode
+        const available = formData.total;
+        await addDoc(collection(db, 'books'), {
+          title: formData.title,
+          author: formData.author,
+          genre: formData.genre,
+          engGenre: engGenre,
+          year: formData.year,
+          shelf: formData.shelf,
+          total: formData.total,
+          available: available,
+          status: 'Có sẵn',
+          createdAt: new Date()
+        });
+      }
+
       setIsModalOpen(false);
     } catch (error) {
-      console.error("Lỗi khi thêm sách:", error);
-      alert("Đã xảy ra lỗi khi thêm sách. Vui lòng thử lại.");
+      console.error("Lỗi khi lưu sách:", error);
+      alert("Đã xảy ra lỗi khi lưu sách. Vui lòng thử lại.");
     }
   };
 
@@ -137,7 +191,7 @@ export default function BookCatalog() {
           </div>
         </div>
         <button 
-          onClick={() => setIsModalOpen(true)}
+          onClick={openAddModal}
           className="bg-primary text-background px-4 py-2 rounded-xl text-sm font-semibold hover:bg-primaryHover transition-colors"
         >
           + Thêm sách
@@ -159,17 +213,26 @@ export default function BookCatalog() {
             const displayStatus = isAvailable ? 'Có sẵn' : 'Đang mượn';
 
             return (
-              <div key={book.id} className="bg-surface border border-[#302A24] rounded-2xl p-4 flex gap-4 hover:border-[#4A4036] transition-colors cursor-pointer group">
+              <div key={book.id} className="bg-surface border border-[#302A24] rounded-2xl p-4 flex gap-4 hover:border-[#4A4036] transition-colors group relative">
+                <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button onClick={() => openEditModal(book)} className="p-1.5 bg-[#302A24] text-text-secondary hover:text-white rounded-lg hover:bg-[#4A4036] transition-colors">
+                    <Edit2 size={14} />
+                  </button>
+                  <button onClick={() => handleDeleteBook(book.id, book.title)} className="p-1.5 bg-[#302A24] text-text-secondary hover:text-[#C36453] rounded-lg hover:bg-[#4A4036] transition-colors">
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+                
                 <div className={`w-20 rounded-lg flex flex-col justify-center p-2 items-center text-center shadow-inner relative overflow-hidden ${genreColorClass}`}>
                    <div className="absolute inset-0 bg-black/20 mix-blend-overlay"></div>
                    <span className="text-[9px] font-bold text-white/90 uppercase tracking-widest mb-1 leading-tight">{book.genre}</span>
                    <span className="text-sm font-serif font-bold text-white leading-tight">{book.title}</span>
                 </div>
-                <div className="flex-1 flex flex-col justify-between py-1">
+                <div className="flex-1 flex flex-col justify-between py-1 pr-6">
                   <div>
                     <div className="flex justify-between items-start">
-                      <h3 className="text-white font-serif font-bold text-base leading-tight mb-1">{book.title}</h3>
-                      <span className={`text-xs font-medium ${statusColor}`}>{displayStatus}</span>
+                      <h3 className="text-white font-serif font-bold text-base leading-tight mb-1 pr-4">{book.title}</h3>
+                      <span className={`text-xs font-medium whitespace-nowrap ${statusColor}`}>{displayStatus}</span>
                     </div>
                     <p className="text-xs text-text-secondary mb-3">{book.author}</p>
                     
@@ -199,11 +262,13 @@ export default function BookCatalog() {
         </div>
       )}
 
-      {/* Modal Thêm Sách */}
+      {/* Modal Thêm/Sửa Sách */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center">
           <div className="bg-surface border border-[#302A24] rounded-2xl p-6 w-full max-w-md shadow-2xl">
-            <h3 className="text-xl font-serif text-white mb-6">Thêm sách mới</h3>
+            <h3 className="text-xl font-serif text-white mb-6">
+              {editingId ? 'Chỉnh sửa sách' : 'Thêm sách mới'}
+            </h3>
             <form onSubmit={handleAddBook} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-text-secondary mb-1">Tên sách</label>
@@ -237,7 +302,7 @@ export default function BookCatalog() {
                   <input required type="text" name="shelf" value={formData.shelf} onChange={handleInputChange} placeholder="VD: A-01" className="w-full bg-background border border-[#302A24] rounded-lg py-2 px-3 text-sm text-white focus:outline-none focus:border-primary/50" />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-text-secondary mb-1">Số lượng bản</label>
+                  <label className="block text-sm font-medium text-text-secondary mb-1">Tổng số lượng</label>
                   <input required type="number" min="1" name="total" value={formData.total} onChange={handleInputChange} className="w-full bg-background border border-[#302A24] rounded-lg py-2 px-3 text-sm text-white focus:outline-none focus:border-primary/50" />
                 </div>
               </div>
@@ -247,7 +312,7 @@ export default function BookCatalog() {
                   Hủy
                 </button>
                 <button type="submit" className="flex-1 bg-primary text-background py-2 rounded-lg text-sm font-semibold hover:bg-primaryHover transition-colors">
-                  Lưu sách
+                  {editingId ? 'Cập nhật' : 'Lưu sách'}
                 </button>
               </div>
             </form>

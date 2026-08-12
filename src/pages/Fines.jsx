@@ -1,11 +1,24 @@
 import React, { useState, useEffect } from 'react';
-import { collection, onSnapshot, doc, updateDoc, getDoc } from 'firebase/firestore';
+import { collection, onSnapshot, doc, updateDoc, getDoc, addDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { format } from 'date-fns';
 
 export default function Fines() {
   const [fines, setFines] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [statusFilter, setStatusFilter] = useState('Tất cả');
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [members, setMembers] = useState([]);
+
+  useEffect(() => {
+    // Fetch members for dropdown
+    const unsubMembers = onSnapshot(collection(db, 'members'), (snapshot) => {
+      const mData = [];
+      snapshot.forEach(doc => mData.push({ id: doc.id, ...doc.data() }));
+      setMembers(mData);
+    });
+    return () => unsubMembers();
+  }, []);
 
   useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, 'fines'), (snapshot) => {
@@ -56,6 +69,8 @@ export default function Fines() {
   const totalUnpaid = fines.filter(f => f.status === 'Chưa thanh toán').reduce((sum, f) => sum + f.amount, 0);
   const totalPaid = fines.filter(f => f.status === 'Đã thanh toán').reduce((sum, f) => sum + f.amount, 0);
 
+  const filteredFines = fines.filter(f => statusFilter === 'Tất cả' || f.status === statusFilter);
+
   return (
     <div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
@@ -73,11 +88,31 @@ export default function Fines() {
         </div>
       </div>
 
+      <div className="flex justify-between items-center mb-6">
+        <div className="flex bg-surface border border-[#302A24] rounded-xl p-1 text-sm max-w-fit">
+          {['Tất cả', 'Chưa thanh toán', 'Đã thanh toán'].map(filter => (
+            <button 
+              key={filter}
+              onClick={() => setStatusFilter(filter)}
+              className={`px-4 py-1 rounded-lg transition-colors ${statusFilter === filter ? 'bg-[#302A24] text-white' : 'text-text-secondary hover:text-white'}`}
+            >
+              {filter}
+            </button>
+          ))}
+        </div>
+        <button 
+          onClick={() => setIsModalOpen(true)}
+          className="bg-primary text-background px-4 py-2 rounded-xl text-sm font-semibold hover:bg-primaryHover transition-colors"
+        >
+          + Thêm phạt
+        </button>
+      </div>
+
       <div className="bg-surface border border-[#302A24] rounded-2xl overflow-hidden min-h-[300px]">
         {loading ? (
           <div className="text-center text-text-secondary py-20">Đang tải dữ liệu...</div>
-        ) : fines.length === 0 ? (
-          <div className="text-center text-text-secondary py-20">Chưa có khoản phạt nào.</div>
+        ) : filteredFines.length === 0 ? (
+          <div className="text-center text-text-secondary py-20">Chưa có dữ liệu cho bộ lọc này.</div>
         ) : (
           <table className="w-full text-left text-sm">
             <thead className="bg-[#1A1614] text-text-secondary text-xs uppercase font-semibold tracking-wider">
@@ -91,7 +126,7 @@ export default function Fines() {
               </tr>
             </thead>
             <tbody className="divide-y divide-[#302A24]">
-              {fines.map(f => (
+              {filteredFines.map(f => (
                 <tr key={f.id} className={`hover:bg-surfaceHover transition-colors ${f.status === 'Đã thanh toán' ? 'opacity-60' : ''}`}>
                   <td className="px-6 py-4 text-white font-medium">{f.memberName}</td>
                   <td className="px-6 py-4 text-text-secondary">{f.reason}</td>
@@ -121,6 +156,111 @@ export default function Fines() {
             </tbody>
           </table>
         )}
+      </div>
+
+      {isModalOpen && (
+        <AddFineModal 
+          onClose={() => setIsModalOpen(false)}
+          members={members}
+        />
+      )}
+    </div>
+  );
+}
+
+function AddFineModal({ onClose, members }) {
+  const [memberId, setMemberId] = React.useState('');
+  const [amount, setAmount] = React.useState('');
+  const [reason, setReason] = React.useState('');
+  const [loading, setLoading] = React.useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!memberId || !amount || !reason) return;
+    
+    setLoading(true);
+    try {
+      const member = members.find(m => m.id === memberId);
+      await addDoc(collection(db, 'fines'), {
+        memberId,
+        memberName: member?.name || 'Unknown',
+        amount: parseFloat(amount),
+        reason,
+        status: 'Chưa thanh toán',
+        createdAt: new Date()
+      });
+
+      // Update member's total fines
+      const memberRef = doc(db, 'members', memberId);
+      const memberSnap = await getDoc(memberRef);
+      if (memberSnap.exists()) {
+        const currentFines = memberSnap.data().fines || 0;
+        await updateDoc(memberRef, {
+          fines: currentFines + parseFloat(amount)
+        });
+      }
+
+      onClose();
+    } catch (error) {
+      console.error("Lỗi khi thêm phạt:", error);
+      alert("Đã xảy ra lỗi.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+      <div className="bg-surface border border-[#302A24] rounded-2xl w-full max-w-md overflow-hidden">
+        <div className="px-6 py-4 border-b border-[#302A24] flex justify-between items-center">
+          <h3 className="text-xl font-serif text-white">Tạo khoản phạt</h3>
+          <button onClick={onClose} className="text-text-secondary hover:text-white">&times;</button>
+        </div>
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          <div>
+            <label className="block text-sm text-text-secondary mb-1">Thành viên</label>
+            <select 
+              required
+              value={memberId}
+              onChange={e => setMemberId(e.target.value)}
+              className="w-full bg-[#1A1614] border border-[#302A24] rounded-lg px-4 py-2 text-white focus:outline-none focus:border-primary"
+            >
+              <option value="">Chọn thành viên</option>
+              {members.map(m => (
+                <option key={m.id} value={m.id}>{m.name} - {m.email}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm text-text-secondary mb-1">Số tiền phạt ($)</label>
+            <input 
+              required
+              type="number"
+              step="0.01"
+              min="0"
+              value={amount}
+              onChange={e => setAmount(e.target.value)}
+              className="w-full bg-[#1A1614] border border-[#302A24] rounded-lg px-4 py-2 text-white focus:outline-none focus:border-primary"
+            />
+          </div>
+          <div>
+            <label className="block text-sm text-text-secondary mb-1">Lý do</label>
+            <input 
+              required
+              type="text"
+              placeholder="VD: Làm hỏng sách"
+              value={reason}
+              onChange={e => setReason(e.target.value)}
+              className="w-full bg-[#1A1614] border border-[#302A24] rounded-lg px-4 py-2 text-white focus:outline-none focus:border-primary"
+            />
+          </div>
+          <div className="flex justify-end gap-3 pt-4 border-t border-[#302A24]">
+            <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-text-secondary hover:text-white transition-colors">Hủy</button>
+            <button type="submit" disabled={loading} className="px-6 py-2 bg-primary text-background text-sm font-semibold rounded-lg hover:bg-primaryHover transition-colors disabled:opacity-50">
+              {loading ? 'Đang lưu...' : 'Lưu'}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );

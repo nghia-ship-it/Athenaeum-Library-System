@@ -10,6 +10,7 @@ export default function Borrowing() {
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [config, setConfig] = useState({ maxLoanDays: 14, finePerDay: 0.5 });
 
   // Filters
   const [statusFilter, setStatusFilter] = useState('Tất cả');
@@ -54,10 +55,18 @@ export default function Borrowing() {
       setMembers(memData);
     });
 
+    // Tải Config
+    const unsubConfig = onSnapshot(doc(db, 'settings', 'config'), (docSnap) => {
+      if (docSnap.exists()) {
+        setConfig(docSnap.data());
+      }
+    });
+
     return () => {
       unsubBorrowings();
       unsubBooks();
       unsubMembers();
+      unsubConfig();
     };
   }, []);
 
@@ -85,10 +94,10 @@ export default function Borrowing() {
       
       let newFine = 0;
       if (today > dueDate) {
-        // Mỗi ngày quá hạn phạt 0.50$
+        // Tính tiền phạt dựa trên config.finePerDay
         const diffTime = Math.abs(today - dueDate);
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
-        newFine = diffDays * 0.50;
+        newFine = diffDays * config.finePerDay;
 
         // Tạo biên bản phạt
         await addDoc(collection(db, 'fines'), {
@@ -265,7 +274,13 @@ export default function Borrowing() {
           </button>
         </div>
         <button 
-          onClick={() => setIsModalOpen(true)}
+          onClick={() => {
+            const defaultDate = new Date();
+            defaultDate.setDate(defaultDate.getDate() + (config.maxLoanDays || 14));
+            // Format YYYY-MM-DD
+            setDueDateStr(defaultDate.toISOString().split('T')[0]);
+            setIsModalOpen(true);
+          }}
           className="bg-primary text-background px-4 py-2 rounded-xl text-sm font-semibold hover:bg-primaryHover transition-colors flex items-center gap-2"
         >
           Cho mượn sách
@@ -296,7 +311,7 @@ export default function Borrowing() {
                 <tr key={b.id} className="hover:bg-surfaceHover transition-colors">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
-                      <div className={`w-6 h-8 bg-genre-${b.bookGenre.toLowerCase()} rounded-sm`}></div>
+                      <div className={`w-6 h-8 bg-genre-${(b.bookGenre || 'classic').toLowerCase()} rounded-sm`}></div>
                       <div>
                         <p className="font-serif font-bold text-white">{b.bookTitle}</p>
                         <p className="text-[10px] text-text-secondary">{b.bookAuthor}</p>
